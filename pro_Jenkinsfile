@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "myorg/fastapi-app"
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        CONTAINER_NAME = "fastapi-container"
+    }
+
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10')) // keep last 10 builds
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/muhammedzaigo/sample_fastapi.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'pip install -r requirements.txt'
+            }
+        }
+
+        stage('Lint & Format') {
+            parallel {
+                stage('Flake8') {
+                    steps {
+                        sh 'flake8 .'
+                    }
+                }
+                stage('Black Check') {
+                    steps {
+                        sh 'black --check .'
+                    }
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                sh 'pytest --maxfail=1 --disable-warnings -q'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                sh "docker stop ${CONTAINER_NAME} || true && docker rm ${CONTAINER_NAME} || true"
+                sh "docker run -d -p 8000:8000 --name ${CONTAINER_NAME} ${DOCKER_IMAGE}:${DOCKER_TAG}"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline finished. Cleaning up..."
+        }
+        failure {
+            echo "❌ Build failed. Check logs."
+        }
+        success {
+            echo "✅ Build succeeded. App running at http://localhost:8000"
+        }
+    }
+}
