@@ -5,7 +5,7 @@ pipeline {
         stage('Clone Repo') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/your/repo.git'
+                    url: 'https://github.com/muhammedzaigo/sample_fastapi.git'
             }
         }
 
